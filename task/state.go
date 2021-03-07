@@ -1,9 +1,38 @@
 package task
 
+import (
+	"fmt"
+	"io"
+	"os"
+)
+
 type Intersection struct {
 	Id IntersectionId
 	In []StreetId
 	T  []int
+}
+
+func (i *Intersection) Clone() *Intersection {
+	in := make([]StreetId, len(i.In))
+	copy(in, i.In)
+	t := make([]int, len(i.T))
+	copy(t, i.T)
+
+	return &Intersection{
+		i.Id,
+		in,
+		t,
+	}
+}
+
+func (i *Intersection) Used() int {
+	count := 0
+	for _, v := range i.T {
+		if v != 0 {
+			count++
+		}
+	}
+	return count
 }
 
 type State struct {
@@ -43,23 +72,52 @@ func MkState(task *Task) *State {
 }
 
 func (s *State) Clone() *State {
-	res := &State{s.Task, make([]Intersection, len(s.G))}
-	for i := 0; i < len(s.G); i++ {
-		in := make([]StreetId, len(s.G[i].In))
-		copy(in, s.G[i].In)
-		t := make([]int, len(s.G[i].T))
-		copy(t, s.G[i].T)
-
-		res.G[i] = Intersection{
-			s.G[i].Id,
-			in,
-			t,
-		}
+	res := &State{s.Task, make([]Intersection, 0, len(s.G))}
+	for _, i := range s.G {
+		res.G = append(res.G, *i.Clone())
 	}
 
 	return res
 }
 
 func (s *State) Write(file string) {
+	count := 0
+	for _, i := range s.G {
+		if i.Used() != 0 {
+			count++
+		}
+	}
 
+	out, err := os.Create(file)
+	if err != nil {
+		panic(err)
+	}
+
+	println(out, count)
+
+	for _, i := range s.G {
+		if c := i.Used(); c != 0 {
+			println(out, i.Id)
+			println(out, c)
+
+			for j := 0; j < len(i.In); j++ {
+				if i.T[j] != 0 {
+					street := s.Task.Streets[i.In[j]].Name
+					println(out, street, i.T[j])
+				}
+			}
+		}
+	}
+
+	err = out.Close()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func println(out io.Writer, args ...interface{}) {
+	_, err := fmt.Fprintln(out, args...)
+	if err != nil {
+		panic(err)
+	}
 }
